@@ -1,6 +1,8 @@
-from typing import Optional
+from typing import Annotated, Optional
+from fastapi import Depends
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from src.database.core import DbSession
 from src.database.entities.user import User
 from src.modules.users.model import UserData
 
@@ -34,3 +36,10 @@ class UserService:
         stmt = select(User).where(User.id == user_id)
         result = await self.db.execute(stmt)
         return result.scalar_one_or_none()
+
+
+async def get_user_service(db: DbSession) -> UserService:
+    return UserService(db)
+
+
+UserServiceDep = Annotated[UserService, Depends(get_user_service)]

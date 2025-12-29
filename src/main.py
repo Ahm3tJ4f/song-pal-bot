@@ -4,23 +4,35 @@ from aiogram.types import Update
 from aiogram import Bot, Dispatcher
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import RedirectResponse
+from sqlalchemy import text
 from src.core.logging import logger
-from src.core.config import TELEGRAM_TOKEN, WEBHOOK_URL
+from src.core.config import TELEGRAM_TOKEN, TELEGRAM_WEBHOOK_SECRET, WEBHOOK_URL
+from src.database.core import engine
 from src.modules.songs.service import SongServiceDep
+from src.modules.users.service import UserServiceDep
 from src.telegram_bot.handlers import router
-from src.telegram_bot.middlewares import DatabaseMiddleware, ServiceMiddleware
+from src.telegram_bot.middlewares import (
+    DatabaseMiddleware,
+    ServiceMiddleware,
+    AuthGuardMiddleware,
+    ConnectionGuardMiddleware,
+)
 
 
 @asynccontextmanager
 async def lifespan(fastapi_app: FastAPI):
-    logger.info("Starting up application...")
+
+    if not TELEGRAM_TOKEN or not TELEGRAM_WEBHOOK_SECRET:
+        raise ValueError("TELEGRAM_TOKEN is not set")
 
     bot = Bot(token=TELEGRAM_TOKEN)
-    await bot.set_webhook(WEBHOOK_URL)
+    await bot.set_webhook(WEBHOOK_URL, secret_token=TELEGRAM_WEBHOOK_SECRET)
 
     dispatcher = Dispatcher()
     dispatcher.update.middleware(DatabaseMiddleware())
     dispatcher.update.middleware(ServiceMiddleware())
+    dispatcher.message.middleware(AuthGuardMiddleware())
+    dispatcher.message.middleware(ConnectionGuardMiddleware())
     dispatcher.include_router(router)
 
     fastapi_app.state.bot = bot
@@ -35,17 +47,16 @@ async def lifespan(fastapi_app: FastAPI):
 app = FastAPI(lifespan=lifespan)
 
 
-@app.get("/")
-async def root():
-    return {"message": "Song Pal Bot API", "docs": "/docs"}
-
-
 @app.get("/health")
 async def health_check():
-    return {
-        "status": "healthy",
-        "database": "connected",
-    }
+    """Health check endpoint for Render and monitoring."""
+    try:
+        async with engine.begin() as conn:
+            await conn.execute(text("SELECT 1"))
+        return {"status": "healthy", "database": "connected"}
+    except Exception as e:
+        logger.error(f"Health check failed: {e}")
+        return {"status": "unhealthy", "database": "disconnected", "error": str(e)}
 
 
 @app.post("/telegram/webhook")
@@ -62,10 +73,29 @@ async def telegram_webhook(request: Request):
 
 
 @app.get("/track/{track_token}")
-async def track_song(track_token: str, song_service: SongServiceDep):
+async def track_song(
+    request: Request,
+    track_token: str,
+    song_service: SongServiceDep,
+    user_service: UserServiceDep,
+):
     song = await song_service.click_song(track_token)
 
     if not song:
         raise HTTPException(status_code=404, detail="Song not found")
+
+    # Notify the sender
+    sender = await user_service.get_user_by_id(song.sender_id)
+    receiver = await user_service.get_user_by_id(song.receiver_id)
+
+    if sender and receiver:
+        bot: Bot = request.app.state.bot
+        try:
+            await bot.send_message(
+                chat_id=sender.telegram_id,
+                text=f"🎧 {receiver.first_name} just listened to your song!\n{song.link}",
+            )
+        except Exception as e:
+            logger.error(f"Failed to send listen notification: {e}")
 
     return RedirectResponse(url=song.link)

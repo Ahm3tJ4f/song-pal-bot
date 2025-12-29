@@ -1,5 +1,6 @@
 from datetime import datetime, timezone
 from typing import Annotated, Optional
+
 from fastapi import Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.sql import select
@@ -38,29 +39,43 @@ class SongService:
         if not song:
             return None
 
-        if song.clicked_at:
-            return song
+        now = datetime.now(timezone.utc)
 
-        song.clicked_at = datetime.now(timezone.utc)
+        # Update clicked_at if not set
+        if not song.clicked_at:
+            song.clicked_at = now
 
-        await self.db.commit()
-        return song
-
-    async def listen_song(self, track_token: str) -> Optional[Song]:
-        stmt = select(Song).where(Song.track_token == track_token)
-        result = await self.db.execute(stmt)
-        song = result.scalar_one_or_none()
-
-        if not song:
-            return None
-
-        if song.listened_at:
-            return song
-
-        song.listened_at = datetime.now(timezone.utc)
+        # Update listened_at (new requirement: click = listened)
+        if not song.listened_at:
+            song.listened_at = now
 
         await self.db.commit()
         return song
+
+    # async def listen_song(self, track_token: str) -> Optional[Song]:
+    #     # Kept for backward compatibility or manual marking if needed,
+    #     # but usage in handlers will be removed.
+    #     stmt = select(Song).where(Song.track_token == track_token)
+    #     result = await self.db.execute(stmt)
+    #     song = result.scalar_one_or_none()
+
+    #     if not song:
+    #         return None
+
+    #     if song.listened_at:
+    #         return song
+
+    #     song.listened_at = datetime.now(timezone.utc)
+
+    #     await self.db.commit()
+    #     return song
+
+    # async def get_unlistened_songs(self) -> list[Song]:
+    #     stmt = select(Song).where(Song.listened_at.is_(None))
+
+    #     result = await self.db.execute(stmt)
+
+    #     return list[Song](result.scalars().all())
 
 
 async def get_song_service(db: DbSession) -> SongService:
