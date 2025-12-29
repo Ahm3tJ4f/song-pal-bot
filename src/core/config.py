@@ -7,7 +7,6 @@ load_dotenv()
 # Telegram Bot Configuration
 TELEGRAM_TOKEN: Final[str | None] = os.getenv("TELEGRAM_TOKEN")
 TELEGRAM_BOT_USERNAME: Final[str | None] = f"@{os.getenv('TELEGRAM_BOT_USERNAME')}"
-
 DATABASE_URL: Final[str | None] = os.getenv("DATABASE_URL")
 
 
@@ -20,3 +19,5 @@ SONG_LINK_PATTERN: Final[str] = (
 )
 
 TELEGRAM_WEBHOOK_SECRET: Final[str | None] = os.getenv("TELEGRAM_WEBHOOK_SECRET")
+
+CRON_JOB_SECRET: Final[str | None] = os.getenv("CRON_JOB_SECRET")
