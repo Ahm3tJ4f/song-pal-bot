@@ -46,18 +46,29 @@ async def start_handler(message: Message, user_service: UserService):
 async def pair_handler(
     message: Message, user: User, connection_service: ConnectionService
 ):
+    logger.info(f"pair_handler called for user {user.id} (telegram_id: {user.telegram_id})")
     try:
+        logger.info(f"Getting or creating pair code for user {user.id}")
         connection = await connection_service.get_or_create_pair_code(user.id)
+        logger.info(f"Pair code created/retrieved: {connection.pair_code} for connection {connection.id}")
 
+        logger.info(f"Sending pair instructions to user {user.telegram_id}")
         await message.answer(
             "Send this command to your partner. When they tap it, you'll be linked! 🔗"
         )
         # Send the full command in a separate message
+        logger.info(f"Sending pair code to user {user.telegram_id}")
         await message.answer(
             f"`/connect {connection.pair_code}`", parse_mode="Markdown"
         )
+        logger.info(f"pair_handler completed successfully for user {user.id}")
     except AlreadyConnectedError as error:
+        logger.warning(f"AlreadyConnectedError for user {user.id}: {error}")
         await message.answer(str(error))
+    except Exception as e:
+        logger.error(f"Unexpected error in pair_handler for user {user.id}: {e}", exc_info=True)
+        await message.answer("An error occurred while generating your pair code. Please try again.")
+        raise  # Re-raise to see in logs
 
 
 @router.message(Command("connect"), flags={"auth_required": True})
