@@ -1,3 +1,4 @@
+import os
 from contextlib import asynccontextmanager
 
 from aiogram.types import Update
@@ -43,7 +44,7 @@ async def lifespan(fastapi_app: FastAPI):
 
     yield
 
-    await bot.delete_webhook(drop_pending_updates=True)
+    await bot.session.close()
 
 
 app = FastAPI(lifespan=lifespan)
