@@ -38,12 +38,13 @@ class NotificationService:
 
         for song, user in result:
             songs_by_telegram_id[user.telegram_id].append(song)
+
         for telegram_id, songs_list in songs_by_telegram_id.items():
-            message_lines = ["🎵 ⏰You have unlistened songs!\n"]
+            message_lines = ["🎵⏰ You have unlistened songs!\n"]
 
             for i, song in enumerate(songs_list, start=1):
                 track_url = generate_track_url(song.track_token)
-                message_lines.append(f"{i}) {track_url}")
+                message_lines.append(f"{i}) {track_url} \n")
 
             message = "\n".join(message_lines)
 

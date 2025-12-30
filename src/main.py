@@ -95,8 +95,10 @@ async def track_song(
         bot: Bot = request.app.state.bot
         await bot.send_message(
             chat_id=sender.telegram_id,
-            text=f"🎧 {receiver.first_name} just listened to your song!\n{song.link}",
+            text=f"🎧 {receiver.first_name} is listening your song!\n{song.link}",
         )
+
+    return RedirectResponse(url=song.link)
 
 
 @app.post("/cron/song-reminders")
