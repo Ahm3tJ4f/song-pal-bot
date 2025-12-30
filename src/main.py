@@ -11,6 +11,7 @@ from src.core.config import (
     TELEGRAM_WEBHOOK_SECRET,
     WEBHOOK_URL,
 )
+from src.core.utils.songs import is_telegram_preview_bot
 from src.modules.notifications.service import NotificationServiceDep
 from src.modules.songs.service import SongServiceDep
 from src.modules.users.service import UserServiceDep
@@ -75,10 +76,17 @@ async def track_song(
     song_service: SongServiceDep,
     user_service: UserServiceDep,
 ):
-    song = await song_service.click_song(track_token)
+    is_telegram_bot = is_telegram_preview_bot(request)
+
+    song = await song_service.click_song(
+        track_token, mark_as_listened=(not is_telegram_bot)
+    )
 
     if not song:
         raise HTTPException(status_code=404, detail="Song not found")
+
+    if is_telegram_bot:
+        return RedirectResponse(url=song.link)
 
     sender = await user_service.get_user_by_id(song.sender_id)
     receiver = await user_service.get_user_by_id(song.receiver_id)
@@ -89,8 +97,6 @@ async def track_song(
             chat_id=sender.telegram_id,
             text=f"🎧 {receiver.first_name} just listened to your song!\n{song.link}",
         )
-
-    return RedirectResponse(url=song.link)
 
 
 @app.post("/cron/song-reminders")

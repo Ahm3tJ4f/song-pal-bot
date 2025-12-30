@@ -106,3 +106,7 @@ venv.bak/
 .mypy_cache/
 
 .idea/*
+
+.cursor/debug.log
+
+diff.txt

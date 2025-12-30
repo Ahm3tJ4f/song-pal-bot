@@ -31,7 +31,9 @@ class SongService:
         await self.db.commit()
         return new_song
 
-    async def click_song(self, track_token: str) -> Optional[Song]:
+    async def click_song(
+        self, track_token: str, mark_as_listened: bool = True
+    ) -> Optional[Song]:
         stmt = select(Song).where(Song.track_token == track_token)
         result = await self.db.execute(stmt)
         song = result.scalar_one_or_none()
@@ -45,8 +47,8 @@ class SongService:
         if not song.clicked_at:
             song.clicked_at = now
 
-        # Update listened_at (new requirement: click = listened)
-        if not song.listened_at:
+        # Update listened_at only if mark_as_listened is True (skip for preview bots)
+        if mark_as_listened and not song.listened_at:
             song.listened_at = now
 
         await self.db.commit()
