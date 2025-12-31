@@ -6,22 +6,24 @@ services:
     image: postgres:16-alpine
     container_name: songpal_postgres
     environment:
-      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_USER: ${POSTGRES_USER:-songpal}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_DB: ${POSTGRES_DB:-songpal}
     ports:
       - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-songpal}"]
       interval: 10s
       timeout: 5s
       retries: 5
     restart: unless-stopped
 
   api:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile
     container_name: songpal_api
     ports:
       - "${API_PORT:-8000}:8000"
@@ -30,17 +32,22 @@ services:
         condition: service_healthy
     environment:
       # Database
-      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_USER: ${POSTGRES_USER:-songpal}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_DB: ${POSTGRES_DB:-songpal}
       POSTGRES_HOST: postgres
       POSTGRES_PORT: 5432
-      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      DATABASE_URL: ${DATABASE_URL}
       # Telegram
       TELEGRAM_TOKEN: ${TELEGRAM_TOKEN}
       TELEGRAM_BOT_USERNAME: ${TELEGRAM_BOT_USERNAME}
+      TELEGRAM_WEBHOOK_SECRET: ${TELEGRAM_WEBHOOK_SECRET}
       # API
       API_BASE_URL: ${API_BASE_URL}
+      # Cron
+      CRON_JOB_SECRET: ${CRON_JOB_SECRET}
+    env_file:
+      - .env
     command: >
       sh -c "
         echo 'Waiting for postgres...' &&
@@ -53,7 +60,7 @@ services:
       "
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:8000/"]
       interval: 30s
       timeout: 10s
       retries: 3
